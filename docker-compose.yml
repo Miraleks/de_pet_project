@@ -1,0 +1,6 @@
+services:
+  data-generator:
+    build: ./data-generator
+    container_name: data-gen-container
+    volumes:
+      - ./generated_data:/app/data
