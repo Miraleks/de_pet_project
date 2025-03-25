@@ -4,3 +4,14 @@ services:
     container_name: data-gen-container
     volumes:
       - ./generated_data:/app/data
+
+  airflow-webserver:
+    image: apache/airflow:latest
+    container_name: airflow-webserver
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./generated_data:/opt/airflow/generated_data
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
