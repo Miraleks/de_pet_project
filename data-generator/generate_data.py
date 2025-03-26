@@ -3,6 +3,7 @@ import pandas as pd
 import random
 from datetime import datetime
 import os
+import stat
 
 fake = Faker(['en_US','de_DE'])
 
@@ -46,5 +47,9 @@ if __name__ == "__main__":
     customers = generate_customer_data(num_records)
     df = pd.DataFrame(customers)
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    df.to_csv(f"{output_dir}/data_{timestamp}.csv", index=False)
+    file_path = f"{output_dir}/data_{timestamp}.csv"
+    df.to_csv(file_path, index=False)
+
+    os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH)
+
     print(f'file {output_dir}/data_{timestamp}.csv was created!')
