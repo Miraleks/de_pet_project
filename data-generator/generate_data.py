@@ -4,6 +4,7 @@ import random
 from datetime import datetime
 import os
 import stat
+import csv
 
 fake = Faker(['en_US','de_DE'])
 
@@ -30,7 +31,7 @@ def generate_customer_data(n):
             "last_name": last_name_method(),
             "age": random.randint(18, 70),
             "gender": gender,
-            "address": fake.address(),
+            "address": fake.address().replace('\n', ', '),
             "email": fake.email(),
             "phone": fake.phone_number(),
             "profession": profession,
@@ -48,7 +49,7 @@ if __name__ == "__main__":
     df = pd.DataFrame(customers)
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     file_path = f"{output_dir}/data_{timestamp}.csv"
-    df.to_csv(file_path, index=False)
+    df.to_csv(file_path, index=False, quoting=csv.QUOTE_ALL, escapechar='\\')
 
     os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH)
 

@@ -21,7 +21,7 @@ variable "location" {
 
 variable "bq_dataset_name" {
   description = "My BigQuery Dataset Name"
-  default     = "demo_bigquery_dataset"
+  default     = "de_pet_project_dataset"
 }
 
 variable "gcs_bucket_name" {
