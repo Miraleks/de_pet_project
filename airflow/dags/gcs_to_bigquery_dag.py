@@ -1,37 +1,73 @@
 from airflow import DAG
-from airflow.operators.dummy import DummyOperator
-from airflow.operators.python import BranchPythonOperator
+from airflow.operators.python import PythonOperator, BranchPythonOperator
+from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 from airflow.providers.google.cloud.transfers.gcs_to_bigquery import GCSToBigQueryOperator
-from airflow.providers.google.cloud.operators.bigquery import BigQueryValueCheckOperator
+from airflow.providers.google.cloud.hooks.gcs import GCSHook
+from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
+from airflow.operators.dummy import DummyOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+from airflow.exceptions import AirflowSkipException
+from airflow.utils.log.logging_mixin import LoggingMixin
 from datetime import datetime
 
+log = LoggingMixin().log
 
-def decide_next_step(**kwargs):
-    # XCom вернёт значение из BigQueryValueCheckOperator
-    has_duplicates = kwargs['ti'].xcom_pull(task_ids='check_duplicates')
-    if has_duplicates != 0:
+def check_gcs_files_exist(**context):
+    execution_date = context['ds']
+    bucket_name = "de-pet-project-data"
+    prefix = f"raw/{execution_date}/"
+
+    hook = GCSHook(gcp_conn_id="google_cloud_default")
+    all_files = hook.list(bucket_name=bucket_name, prefix=prefix)
+    matching_files = [f for f in all_files if f.endswith(".csv") and f.startswith(prefix + "data_")]
+
+    if not matching_files:
+        raise AirflowSkipException(f"No files found in {prefix} to process.")
+    else:
+        log.info(f"Found {len(matching_files)} files to load: {matching_files}")
+        context['ti'].xcom_push(key='matching_files', value=matching_files)
+
+def decide_branch(**kwargs):
+    hook = BigQueryHook(gcp_conn_id='google_cloud_default', use_legacy_sql=False)
+    sql = """
+            SELECT COUNT(*) as duplicate_count FROM (
+                SELECT email, COUNT(*) as cnt
+                FROM `de-pet-project-first.de_pet_project_dataset.customers`
+                GROUP BY email
+                HAVING cnt > 1
+            )
+        """
+    records = hook.get_pandas_df(sql).to_dict(orient='records')
+    count = records[0]['duplicate_count'] if records else 0
+
+    if count > 0:
         return 'trigger_clean_dag'
     else:
         return 'skip_cleanup'
 
-
-default_args = {
-    'start_date': datetime(2024, 3, 27),
-    'catchup': False
-}
-
 with DAG(
-    dag_id="gcs_to_bigquery_dag",
-    default_args=default_args,
+    dag_id="gcs_to_bigquery_with_validation",
+    start_date=datetime(2024, 3, 27),
     schedule_interval=None,
+    catchup=False
 ) as dag:
 
-    # Загрузка из GCS в BigQuery
+    check_files = PythonOperator(
+        task_id="check_gcs_files",
+        python_callable=check_gcs_files_exist,
+        provide_context=True
+    )
+
     load_data_to_bq = GCSToBigQueryOperator(
         task_id="load_data_to_bq",
         bucket="de-pet-project-data",
-        source_objects=["raw/{{ ds }}/data_*.csv"],
+        source_objects=[
+            "raw/2025-03-25/data_*.csv",
+            "raw/2025-03-26/data_*.csv",
+            "raw/2025-03-27/data_*.csv",
+            "raw/2025-03-28/data_*.csv",
+            "raw/2025-03-29/data_*.csv"
+        ],
         destination_project_dataset_table="de-pet-project-first.de_pet_project_dataset.customers",
         schema_fields=[
             {"name": "first_name", "type": "STRING", "mode": "NULLABLE"},
@@ -52,38 +88,37 @@ with DAG(
         gcp_conn_id="google_cloud_default"
     )
 
-    # Проверка на дубликаты
-    check_duplicates = BigQueryValueCheckOperator(
-        task_id="check_duplicates",
-        sql="""
-            SELECT COUNT(*) FROM (
-                SELECT email, COUNT(*) AS cnt
-                FROM `de-pet-project-first.de_pet_project_dataset.customers`
-                GROUP BY email
-                HAVING cnt > 1
-            )
-        """,
-        pass_value=0,
-        gcp_conn_id="google_cloud_default",
-        use_legacy_sql=False
+    count_duplicates = BigQueryInsertJobOperator(
+        task_id="count_duplicates",
+        configuration={
+            "query": {
+                "query": """
+                    SELECT COUNT(*) as duplicate_count FROM (
+                        SELECT email, COUNT(*) as cnt
+                        FROM `de-pet-project-first.de_pet_project_dataset.customers`
+                        GROUP BY email
+                        HAVING cnt > 1
+                    )
+                """,
+                "useLegacySql": False
+            }
+        },
+        gcp_conn_id="google_cloud_default"
     )
 
-    # Ветвление: если дубликаты есть — запускаем другой DAG
     branch = BranchPythonOperator(
-        task_id='branch_on_duplicates',
-        python_callable=decide_next_step,
+        task_id="branch_on_duplicates",
+        python_callable=decide_branch,
         provide_context=True
     )
 
-    # Запуск дага очистки
     trigger_clean_dag = TriggerDagRunOperator(
         task_id="trigger_clean_dag",
         trigger_dag_id="remove_duplicates_dag",
     )
 
-    # Пустышка, если всё ок
     skip_cleanup = DummyOperator(task_id="skip_cleanup")
 
-    load_data_to_bq >> check_duplicates >> branch
+    check_files >> load_data_to_bq >> count_duplicates >> branch
     branch >> trigger_clean_dag
     branch >> skip_cleanup
