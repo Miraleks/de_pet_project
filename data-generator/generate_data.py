@@ -14,6 +14,13 @@ os.makedirs(output_dir, exist_ok=True)
 
 def generate_customer_data(n):
     data = []
+
+    # Вероятность вставки NULL
+    null_prob = 0.1
+
+    def maybe_null(value):
+        return value if random.random() > null_prob else None
+
     for _ in range(n):
         current_hour = datetime.now().hour
         profession = random.choice(["Engineer", "Teacher", "Designer", "Doctor", "Developer"])
@@ -23,19 +30,19 @@ def generate_customer_data(n):
             profession = random.choice(["Artist", "Musician", "Chef"])
 
         gender = random.choice(["M", "F"])
-        name_method = fake.first_name_male if gender == 'M' else fake.first_name_female
-        last_name_method = fake.last_name_male if gender == 'M' else fake.last_name_female
+        name_method = maybe_null(fake.first_name_male) if gender == 'M' else maybe_null(fake.first_name_female)
+        last_name_method = maybe_null(fake.last_name_male) if gender == 'M' else maybe_null(fake.last_name_female)
 
         customer = {
             "first_name": name_method(),
             "last_name": last_name_method(),
-            "age": random.randint(18, 70),
+            "age": maybe_null(random.randint(18, 70)),
             "gender": gender,
-            "address": fake.address().replace('\n', ', '),
-            "email": fake.email(),
-            "phone": fake.phone_number(),
-            "profession": profession,
-            "manager": fake.name(),
+            "address": maybe_null(fake.address().replace('\n', ', ')),
+            "email": maybe_null(fake.email()),
+            "phone": maybe_null(fake.phone_number()),
+            "profession": maybe_null(profession),
+            "manager": maybe_null(fake.name()),
             "created_at": datetime.now().isoformat()
         }
         data.append(customer)
