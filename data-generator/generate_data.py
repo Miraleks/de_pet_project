@@ -6,6 +6,10 @@ import os
 import stat
 import csv
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
 fake = Faker(['en_US','de_DE'])
 
 output_dir = "/app/data"
@@ -30,12 +34,12 @@ def generate_customer_data(n):
             profession = random.choice(["Artist", "Musician", "Chef"])
 
         gender = random.choice(["M", "F"])
-        name_method = maybe_null(fake.first_name_male) if gender == 'M' else maybe_null(fake.first_name_female)
-        last_name_method = maybe_null(fake.last_name_male) if gender == 'M' else maybe_null(fake.last_name_female)
+        name_method = maybe_null(fake.first_name_male()) if gender == 'M' else maybe_null(fake.first_name_female())
+        last_name_method = maybe_null(fake.last_name_male()) if gender == 'M' else maybe_null(fake.last_name_female())
 
         customer = {
-            "first_name": name_method(),
-            "last_name": last_name_method(),
+            "first_name": name_method,
+            "last_name": last_name_method,
             "age": maybe_null(random.randint(18, 70)),
             "gender": gender,
             "address": maybe_null(fake.address().replace('\n', ', ')),
@@ -51,13 +55,17 @@ def generate_customer_data(n):
 
 
 if __name__ == "__main__":
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+
+    logging.info(f'Creating a file {output_dir}/data_{timestamp}.csv has begun!')
+
     num_records = random.randint(20, 50)
     customers = generate_customer_data(num_records)
     df = pd.DataFrame(customers)
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+
     file_path = f"{output_dir}/data_{timestamp}.csv"
     df.to_csv(file_path, index=False, quoting=csv.QUOTE_ALL, escapechar='\\')
 
     os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH)
 
-    print(f'file {output_dir}/data_{timestamp}.csv was created!')
+    logging.info(f'file {output_dir}/data_{timestamp}.csv was created!')
