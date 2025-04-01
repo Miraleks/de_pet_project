@@ -12,8 +12,8 @@ COPY generate_cron.sh .
 
 RUN chmod +x generate_cron.sh
 
-#ARG CRON_SCHEDULE="0 10-20 * * *"
-ARG CRON_SCHEDULE="* * * * *"
+ARG CRON_SCHEDULE="0 10-20 * * *"
+#ARG CRON_SCHEDULE="* * * * *"
 RUN echo "$CRON_SCHEDULE /app/generate_cron.sh >> /var/log/cron.log 2>&1" > /etc/cron.d/data-cron
 
 
