@@ -52,3 +52,13 @@ services:
       - ./generated_data:/opt/airflow/generated_data
       - ./airflow/logs:/opt/airflow/logs
     command: bash -c "airflow db upgrade && airflow scheduler"
+
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase
+    ports:
+      - "3000:3000"
+    environment:
+      MB_DB_FILE: /metabase.db
+    depends_on:
+      - postgres
