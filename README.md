@@ -48,7 +48,7 @@ The project simulates data ingestion and analytics for a fictional retail store,
 ## 🚦 CI/CD Pipeline (GitHub Actions)
 
 Automated CI/CD workflows include:
-- Code linting and testing (`pytest`, `flake8`)
+- Code linting and testing (`ruff`, `pytest`)
 - Terraform infrastructure deployment
 - Docker image build and deployment
 - Airflow DAG deployment
