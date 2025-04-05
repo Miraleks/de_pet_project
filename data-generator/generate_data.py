@@ -1,4 +1,3 @@
-from faker import Faker
 import pandas as pd
 import random
 from datetime import datetime
@@ -7,6 +6,8 @@ import stat
 import csv
 
 import logging
+
+from faker import Faker
 
 logging.basicConfig(level=logging.INFO)
 

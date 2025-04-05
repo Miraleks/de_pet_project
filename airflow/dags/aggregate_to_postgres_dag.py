@@ -3,7 +3,6 @@ from airflow.operators.python import PythonOperator
 from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from datetime import datetime
-import pandas as pd
 
 def aggregate_and_export(**kwargs):
     # BigQuery: агрегируем общее
